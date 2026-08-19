@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Le Chemin du Dedans — BIOCURSUS</title>
+  <meta name="description" content="Un questionnaire pour revenir à toi. Par BIOCURSUS." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { min-height:100vh; background:linear-gradient(170deg,#1a1a2e 0%,#16213e 40%,#0f3460 100%); font-family:'Cormorant Garamond',Georgia,serif; color:#e8e4dc; -webkit-font-smoothing:antialiased; }
+    #root { min-height:100vh; }
+    textarea:focus, input:focus { outline:none; border-color:rgba(196,149,106,0.4) !important; }
+    ::placeholder { color:rgba(232,228,220,0.25); }
+    ::selection { background:rgba(196,149,106,0.3); }
+    @keyframes pulse { 0%,100%{opacity:0.3;} 50%{opacity:1;} }
+    .dot-pulse span { animation:pulse 1.4s ease-in-out infinite; }
+    .dot-pulse span:nth-child(2) { animation-delay:0.2s; }
+    .dot-pulse span:nth-child(3) { animation-delay:0.4s; }
+    input[type="text"], input[type="email"] { width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:#e8e4dc; font-size:16px; line-height:1.7; padding:14px 18px; font-family:'Cormorant Garamond',Georgia,serif; box-sizing:border-box; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+var defined=React,useState=defined.useState,useEffect=defined.useEffect;
+var e=React.createElement;
+var sans="'Inter','Helvetica Neue',Arial,sans-serif";
+
+var STEPS=[
+  {id:"intro",phase:null,title:"Le Chemin du Dedans",subtitle:"Un questionnaire pour revenir \u00e0 toi",
+    description:"Ce questionnaire n'est pas un test. Il n'y a ni bonne ni mauvaise r\u00e9ponse, ni score, ni diagnostic. C'est un chemin. Tu arrives avec une situation qui te p\u00e8se, et question apr\u00e8s question, tu vas pouvoir poser un regard diff\u00e9rent sur ce que tu vis. Prends ton temps. Sois honn\u00eate avec toi-m\u00eame. C'est tout ce qui compte.",type:"intro"},
+  {id:"q1",phase:"Nommer",principle:"Le conflit commence en soi",
+    question:"Quelle situation te p\u00e8se en ce moment ?",hint:"D\u00e9cris-la simplement, comme tu la raconterais \u00e0 quelqu'un de confiance.",type:"text"},
+  {id:"q2",phase:"Nommer",principle:"Le conflit commence en soi",
+    question:"Qui ou quoi tiens-tu pour responsable de cette situation ?",hint:"Une personne, un groupe, une circonstance, le hasard, toi-m\u00eame... Dis ce qui te vient sans te censurer.",type:"text"},
+  {id:"q3",phase:"Le miroir",principle:"Le champ magn\u00e9tique",
+    question:"Est-ce la premi\u00e8re fois que tu vis ce type de situation, ou reconnais-tu un sch\u00e9ma qui revient ?",type:"choice",
+    choices:["C'est la premi\u00e8re fois","\u00c7a me rappelle quelque chose","C'est un sch\u00e9ma que je connais bien"]},
+  {id:"q3b",phase:"Le miroir",principle:"Le champ magn\u00e9tique",
+    question:"Qu'est-ce que ces situations qui reviennent ont en commun ?",hint:"Pas les faits, mais ce que tu ressens \u00e0 chaque fois.",type:"text",
+    condition:function(a){return a.q3==="\u00c7a me rappelle quelque chose"||a.q3==="C'est un sch\u00e9ma que je connais bien";}},
+  {id:"q4",phase:"Le ring",principle:"Faute d'un des deux combattants, la guerre s'arr\u00eate",
+    question:"Si cette personne ou cette situation disparaissait demain matin de ta vie... est-ce que ce que tu ressens \u00e0 l'int\u00e9rieur disparaitrait aussi ?",type:"choice",
+    choices:["Oui, tout irait mieux","Je ne suis pas s\u00fbr(e)","Non, je crois que je porterais \u00e7a quand m\u00eame"]},
+  {id:"q5",phase:"Le ring",principle:"Le corps physique comme \u00e9ponge \u00e9nerg\u00e9tique",
+    question:"Quand tu penses \u00e0 cette situation, qu'est-ce que tu ressens exactement dans ton corps ?",hint:"Gorge serr\u00e9e, ventre nou\u00e9, poitrine lourde, m\u00e2choire crisp\u00e9e... \u00c9coute ton corps, pas ta t\u00eate.",type:"text"},
+  {id:"q6",phase:"Le ring",principle:"Le champ magn\u00e9tique",
+    question:"Et si ce ressenti corporel \u00e9tait d\u00e9j\u00e0 l\u00e0 avant cette situation... depuis quand le portes-tu ?",hint:"Remonte le fil. Pas l'histoire, la sensation.",type:"text"},
+  {id:"q7",phase:"La volont\u00e9",principle:"La volont\u00e9 de surface vs la volont\u00e9 v\u00e9ritable",
+    question:"Qu'est-ce que tu veux vraiment ?",type:"choice",
+    choices:["Que l'ext\u00e9rieur change","Retrouver ma paix, quoi qu'il arrive dehors"]},
+  {id:"q8",phase:"Le cr\u00e9ateur",principle:"Nous sommes des cr\u00e9ateurs",
+    question:"Si cette situation \u00e9tait l\u00e0 pour te montrer quelque chose sur toi, qu'est-ce que ce serait ?",hint:"Pas ce que l'autre te fait. Ce que \u00e7a r\u00e9v\u00e8le de ce qui, en toi, n'est pas en paix.",type:"text"},
+  {id:"q9",phase:"Le cr\u00e9ateur",principle:"Les r\u00f4les incarn\u00e9s et la promesse",
+    question:"Si tu avais toi-m\u00eame cr\u00e9\u00e9 cette situation pour te rappeler quelque chose d'essentiel sur ta nature, qu'est-ce que tu aurais voulu te rappeler ?",type:"text"},
+  {id:"q10",phase:"Le choix",principle:"Le libre arbitre comme choix permanent",
+    question:"Maintenant, face \u00e0 cette situation, que choisis-tu ?",type:"choice",
+    choices:["Je choisis de continuer \u00e0 me battre","Je choisis de voir autrement","Je choisis de revenir \u00e0 moi"]},
+  {id:"capture",phase:null,type:"capture"},
+  {id:"closing",phase:null,type:"closing"}
+];
+
+var PHASE_COLORS={"Nommer":"#7C9885","Le miroir":"#6B8A9E","Le ring":"#8B7D9E","La volont\u00e9":"#C4956A","Le cr\u00e9ateur":"#B8860B","Le choix":"#D4A574"};
+
+var REFLECT_KEYS=[
+  {label:"Ta situation",key:"q1",color:"#7C9885"},
+  {label:"Ce que tu pointes \u00e0 l'ext\u00e9rieur",key:"q2",color:"#7C9885"},
+  {label:"Ce que ton corps te dit",key:"q5",color:"#8B7D9E"},
+  {label:"Ce que tu portes depuis longtemps",key:"q6",color:"#8B7D9E"},
+  {label:"Ce que cette situation te montre de toi",key:"q8",color:"#B8860B"},
+  {label:"Ce que tu veux te rappeler",key:"q9",color:"#B8860B"}
+];
+
+var SYSTEM_PROMPT="Tu es le moteur de synth\u00e8se du questionnaire \"Le Chemin du Dedans\" de BIOCURSUS.\n\nPRINCIPES FONDATEURS :\n1. Le conflit commence en soi : d\u00e8s qu'on dit non \u00e0 ce qu'on sent en soi, le conflit d\u00e9marre.\n2. Nous sommes des cr\u00e9ateurs : tout ce qu'il y a dans notre existence, c'est ce que nous portons \u00e0 l'int\u00e9rieur.\n3. Le principe du ring : faute d'un des deux combattants, la guerre s'arr\u00eate.\n4. L'amour sous-jacent \u00e0 tout conflit : dans toute dispute il y a une aspiration totale \u00e0 l'amour.\n5. Le champ magn\u00e9tique : on attire \u00e0 soi ce que l'on vibre.\n6. Volont\u00e9 de surface vs volont\u00e9 v\u00e9ritable : vouloir que l'ext\u00e9rieur change vs se rappeler la paix qu'on est.\n7. Le libre arbitre : \u00e0 chaque instant, s\u00e9paration ou unit\u00e9.\n8. Le corps physique comme \u00e9ponge \u00e9nerg\u00e9tique : les conflits int\u00e9rieurs descendent dans le corps.\n9. Le miroir : l'univers refl\u00e8te ce qu'on porte en soi.\n10. Nous sommes le ciel, pas les nuages.\n\nINSTRUCTIONS :\nTu re\u00e7ois les r\u00e9ponses d'une personne. Produis une synth\u00e8se personnalis\u00e9e en 3 parties :\n\n1. LE MIROIR (4-5 lignes) : Ce que ses r\u00e9ponses r\u00e9v\u00e8lent sur le conflit int\u00e9rieur qu'elle porte. Pas un diagnostic. Une mise en lumi\u00e8re douce mais honn\u00eate.\n\n2. LE FIL ROUGE (3-4 lignes) : Le lien entre sa situation ext\u00e9rieure et ce qui en elle n'est pas en paix. Relier les r\u00e9ponses entre elles.\n\n3. TES PREMIERS PAS (2-3 pistes concr\u00e8tes) : Des choses \u00e0 observer ou pratiquer au quotidien pour commencer \u00e0 revenir \u00e0 soi. Ancr\u00e9es dans ce que la personne a \u00e9crit.\n\nR\u00c8GLES :\n- Tutoiement obligatoire\n- Ton chaleureux, profond, sans jargon\n- Jamais de diagnostic ni de pathologisation\n- Ne jamais utiliser de tirets longs\n- Pas de listes \u00e0 puces, prose fluide\n- Utilise les mots de la personne\n- Commence chaque partie par son titre en majuscules suivi d'un saut de ligne\n- Maximum 250 mots au total\n- Ne mentionne jamais BIOCURSUS, Mathieu, ni de CTA commercial";
+
+function buildUserPrompt(answers){
+  var parts=["Voici les r\u00e9ponses de cette personne au questionnaire Le Chemin du Dedans :\n"];
+  var labels={q1:"Situation qui p\u00e8se",q2:"Responsable d\u00e9sign\u00e9",q3:"Sch\u00e9ma r\u00e9current",q3b:"Ce que les situations r\u00e9currentes ont en commun",q4:"Si la situation disparaissait",q5:"Ressenti corporel",q6:"Depuis quand ce ressenti",q7:"Ce qu'elle veut vraiment",q8:"Ce que la situation montre d'elle",q9:"Ce qu'elle veut se rappeler",q10:"Son choix"};
+  Object.keys(labels).forEach(function(k){if(answers[k])parts.push(labels[k]+" : "+answers[k]);});
+  parts.push("\nG\u00e9n\u00e8re la synth\u00e8se personnalis\u00e9e.");
+  return parts.join("\n");
+}
+
+async function fetchSynthesis(answers){
+  var r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,system:SYSTEM_PROMPT,messages:[{role:"user",content:buildUserPrompt(answers)}]})});
+  var d=await r.json();
+  return d.content.map(function(b){return b.text||"";}).filter(Boolean).join("\n");
+}
+
+async function sendEmails(name,email,answers,synthesis){
+  try{
+    var r=await fetch("/.netlify/functions/submit",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name:name,email:email,answers:answers,synthesis:synthesis})});
+    return r.ok;
+  }catch(err){console.error("Send error:",err);return false;}
+}
+
+function generatePDF(answers,synthesis){
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  var W=210,H=297,mL=25,mR=25,cW=W-mL-mR,y=0;
+
+  doc.setFillColor(26,26,46);doc.rect(0,0,W,H,'F');
+  doc.setDrawColor(196,149,106);doc.setLineWidth(0.3);doc.line(W/2-20,80,W/2+20,80);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(196,149,106);
+  doc.text('BIOCURSUS',W/2,90,{align:'center'});
+  doc.setFont('times','normal');doc.setFontSize(32);doc.setTextColor(240,236,228);
+  doc.text('Le Chemin du Dedans',W/2,115,{align:'center'});
+  doc.setFont('times','italic');doc.setFontSize(14);doc.setTextColor(196,149,106);
+  doc.text('R\u00e9capitulatif personnel',W/2,128,{align:'center'});
+  var dateStr=new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(150,150,160);
+  doc.text(dateStr,W/2,145,{align:'center'});
+  doc.setFont('times','italic');doc.setFontSize(11);doc.setTextColor(196,149,106);
+  doc.text(doc.splitTextToSize('\u00ab Nous ne sommes pas les nuages, ni la foudre, ni la pluie. Nous sommes le ciel. \u00bb',cW-20),W/2,220,{align:'center'});
+
+  function header(){doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(196,149,106);doc.text('BIOCURSUS',mL,15);doc.setTextColor(120,120,135);doc.text('Le Chemin du Dedans',W-mR,15,{align:'right'});}
+  function newPage(){doc.addPage();doc.setFillColor(26,26,46);doc.rect(0,0,W,H,'F');header();y=30;}
+
+  newPage();
+  doc.setFont('times','normal');doc.setFontSize(20);doc.setTextColor(240,236,228);
+  doc.text('Tes r\u00e9ponses',mL,y);y+=5;
+  doc.setDrawColor(196,149,106);doc.setLineWidth(0.2);doc.line(mL,y,mL+30,y);y+=12;
+
+  [{l:"Ta situation",k:"q1"},{l:"Ce que tu pointes \u00e0 l'ext\u00e9rieur",k:"q2"},{l:"Sch\u00e9ma r\u00e9current",k:"q3"},{l:"Ce que ces situations ont en commun",k:"q3b"},{l:"Si la situation disparaissait...",k:"q4"},{l:"Ce que ton corps te dit",k:"q5"},{l:"Ce que tu portes depuis longtemps",k:"q6"},{l:"Ce que tu veux vraiment",k:"q7"},{l:"Ce que cette situation te montre de toi",k:"q8"},{l:"Ce que tu veux te rappeler",k:"q9"},{l:"Ton choix",k:"q10"}].forEach(function(s){
+    var ans=answers[s.k];if(!ans)return;
+    var lines=doc.splitTextToSize(ans,cW-5);var bh=8+(lines.length*5)+14;
+    if(y+bh>H-30){newPage();}
+    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(196,149,106);
+    doc.text(s.l.toUpperCase(),mL,y);y+=6;
+    doc.setFont('times','italic');doc.setFontSize(11);doc.setTextColor(200,196,188);
+    doc.text(lines,mL+2,y);y+=lines.length*5;
+    y+=4;doc.setDrawColor(60,60,80);doc.setLineWidth(0.1);doc.line(mL,y,mL+cW,y);y+=10;
+  });
+
+  if(synthesis){
+    newPage();
+    doc.setFont('times','normal');doc.setFontSize(20);doc.setTextColor(240,236,228);
+    doc.text('Ta synth\u00e8se personnalis\u00e9e',mL,y);y+=5;
+    doc.setDrawColor(196,149,106);doc.setLineWidth(0.2);doc.line(mL,y,mL+30,y);y+=14;
+    synthesis.split('\n').forEach(function(line){
+      if(!line.trim()){y+=4;return;}
+      var t=line.trim();var isT=t===t.toUpperCase()&&t.length>3&&t.length<30;
+      if(isT){if(y+20>H-30){newPage();}y+=4;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(196,149,106);doc.text(t,mL,y);y+=8;}
+      else{var sl=doc.splitTextToSize(t,cW);if(y+(sl.length*5.5)>H-30){newPage();}doc.setFont('times','normal');doc.setFontSize(11);doc.setTextColor(210,206,198);doc.text(sl,mL,y);y+=sl.length*5.5;}
+    });
+  }
+
+  if(y+60>H-30){newPage();}
+  y+=10;doc.setDrawColor(196,149,106);doc.setLineWidth(0.2);doc.line(W/2-15,y,W/2+15,y);y+=12;
+  doc.setFont('times','italic');doc.setFontSize(11);doc.setTextColor(196,149,106);
+  doc.text('\u00ab Nous ne sommes pas les nuages, ni la foudre, ni la pluie.',W/2,y,{align:'center'});y+=6;
+  doc.text('Nous sommes le ciel. \u00bb',W/2,y,{align:'center'});y+=20;
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(160,156,148);
+  var cl=doc.splitTextToSize('Pour aller plus loin et travailler sur ce que ce questionnaire a mis en lumi\u00e8re, tu peux r\u00e9server une s\u00e9ance avec Mathieu :',cW-20);
+  doc.text(cl,W/2,y,{align:'center'});y+=cl.length*5+4;
+  doc.setTextColor(196,149,106);
+  doc.textWithLink('R\u00e9server ma s\u00e9ance',W/2,y,{align:'center',url:'https://tidycal.com/cursuslp/chemindudedans'});
+  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(80,80,95);
+  doc.text('BIOCURSUS \u2014 Approche fonctionnelle et hypnose',W/2,H-12,{align:'center'});
+  doc.save('Le-Chemin-du-Dedans-BIOCURSUS.pdf');
+}
+
+function App(){
+  var _s=useState(0),currentStep=_s[0],setCurrentStep=_s[1];
+  var _a=useState({}),answers=_a[0],setAnswers=_a[1];
+  var _t=useState(""),textValue=_t[0],setTextValue=_t[1];
+  var _v=useState(true),visible=_v[0],setVisible=_v[1];
+  var _sy=useState(null),synthesis=_sy[0],setSynthesis=_sy[1];
+  var _sl=useState(false),synthLoading=_sl[0],setSynthLoading=_sl[1];
+  var _se=useState(false),synthError=_se[0],setSynthError=_se[1];
+  var _n=useState(""),userName=_n[0],setUserName=_n[1];
+  var _e2=useState(""),userEmail=_e2[0],setUserEmail=_e2[1];
+  var _es=useState(false),emailSent=_es[0],setEmailSent=_es[1];
+
+  var step=STEPS[currentStep];
+  var activeSteps=STEPS.filter(function(s){return !s.condition||s.condition(answers);});
+  var currentActiveIndex=activeSteps.findIndex(function(s){return s.id===step.id;});
+  var totalActive=activeSteps.length;
+
+  useEffect(function(){
+    if(step.type==="closing"&&!synthesis&&!synthLoading){
+      setSynthLoading(true);
+      fetchSynthesis(answers).then(function(text){
+        setSynthesis(text);setSynthLoading(false);
+        sendEmails(userName,userEmail,answers,text).then(function(ok){if(ok)setEmailSent(true);});
+      }).catch(function(err){console.error(err);setSynthError(true);setSynthLoading(false);});
+    }
+  },[step.type]);
+
+  function goNext(){
+    setVisible(false);
+    setTimeout(function(){
+      var next=currentStep+1;
+      while(next<STEPS.length){if(STEPS[next].condition&&!STEPS[next].condition(answers)){next++;}else{break;}}
+      setCurrentStep(next);setTextValue("");setVisible(true);
+      window.scrollTo({top:0,behavior:'smooth'});
+    },500);
+  }
+  function handleChoice(c){var na=Object.assign({},answers);na[step.id]=c;setAnswers(na);setTimeout(goNext,300);}
+  function handleTextSubmit(){if(textValue.trim()){var na=Object.assign({},answers);na[step.id]=textValue.trim();setAnswers(na);goNext();}}
+  function handleKeyDown(ev){if(ev.key==='Enter'&&(ev.metaKey||ev.ctrlKey)&&textValue.trim()){handleTextSubmit();}}
+  function handleCaptureSubmit(){if(userName.trim()&&userEmail.trim()&&userEmail.includes('@')){goNext();}}
+  function handleDownloadPDF(){try{generatePDF(answers,synthesis);}catch(err){console.error(err);}}
+
+  var phaseColor=step.phase?(PHASE_COLORS[step.phase]||"#888"):"#888";
+  var progress=step.type==="intro"?0:step.type==="closing"?100:step.type==="capture"?95:Math.round((currentActiveIndex/(totalActive-1))*100);
+
+  var ambient1=e('div',{style:{position:'fixed',top:'-20%',right:'-10%',width:'500px',height:'500px',borderRadius:'50%',background:'radial-gradient(circle, rgba(196,149,106,0.06) 0%, transparent 70%)',pointerEvents:'none'}});
+  var ambient2=e('div',{style:{position:'fixed',bottom:'-15%',left:'-10%',width:'400px',height:'400px',borderRadius:'50%',background:'radial-gradient(circle, rgba(107,138,158,0.06) 0%, transparent 70%)',pointerEvents:'none'}});
+  var progressBar=step.type!=="intro"?e('div',{style:{position:'fixed',top:0,left:0,right:0,height:'3px',background:'rgba(255,255,255,0.08)',zIndex:10}},
+    e('div',{style:{height:'100%',width:progress+'%',background:'linear-gradient(90deg, '+phaseColor+', #C4956A)',transition:'width 0.6s ease'}})
+  ):null;
+
+  var content=null;
+
+  if(step.type==="intro"){
+    content=e('div',{style:{textAlign:'center'}},
+      e('div',{style:{fontSize:'11px',letterSpacing:'4px',textTransform:'uppercase',color:'#C4956A',marginBottom:'24px',fontFamily:sans}},'BIOCURSUS'),
+      e('h1',{style:{fontSize:'clamp(28px, 5vw, 42px)',fontWeight:400,lineHeight:1.2,margin:'0 0 12px',color:'#f0ece4'}},step.title),
+      e('p',{style:{fontSize:'17px',fontStyle:'italic',color:'#C4956A',margin:'0 0 40px'}},step.subtitle),
+      e('p',{style:{fontSize:'15px',lineHeight:1.9,color:'rgba(232,228,220,0.7)',maxWidth:'480px',margin:'0 auto 48px'}},step.description),
+      e('button',{onClick:goNext,style:{background:'none',border:'1px solid rgba(196,149,106,0.5)',color:'#C4956A',padding:'14px 48px',fontSize:'13px',letterSpacing:'2px',textTransform:'uppercase',cursor:'pointer',fontFamily:sans,transition:'all 0.3s ease',borderRadius:'2px'},
+        onMouseOver:function(ev){ev.target.style.background='rgba(196,149,106,0.12)';},onMouseOut:function(ev){ev.target.style.background='none';}},'Commencer')
+    );
+  }
+
+  if(step.type==="text"||step.type==="choice"){
+    var els=[];
+    if(step.phase)els.push(e('div',{key:'ph',style:{fontSize:'11px',letterSpacing:'3px',textTransform:'uppercase',color:phaseColor,marginBottom:'12px',fontFamily:sans}},step.phase));
+    if(step.principle)els.push(e('div',{key:'pr',style:{fontSize:'13px',fontStyle:'italic',color:'rgba(232,228,220,0.35)',marginBottom:'32px'}},step.principle));
+    els.push(e('h2',{key:'q',style:{fontSize:'clamp(20px, 4vw, 28px)',fontWeight:400,lineHeight:1.5,margin:'0 0 28px',color:'#f0ece4'}},step.question));
+    if(step.hint)els.push(e('p',{key:'h',style:{fontSize:'14px',fontStyle:'italic',color:'rgba(232,228,220,0.4)',margin:'0 0 32px',lineHeight:1.7}},step.hint));
+    if(step.type==="text"){
+      els.push(e('div',{key:'i'},
+        e('textarea',{value:textValue,onChange:function(ev){setTextValue(ev.target.value);},onKeyDown:handleKeyDown,placeholder:'\u00c9cris ici...',rows:5,
+          style:{width:'100%',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'4px',color:'#e8e4dc',fontSize:'16px',lineHeight:1.7,padding:'16px 18px',fontFamily:"'Cormorant Garamond',Georgia,serif",resize:'vertical',boxSizing:'border-box'}}),
+        e('div',{style:{marginTop:'24px',display:'flex',justifyContent:'space-between',alignItems:'center'}},
+          e('span',{style:{fontSize:'11px',color:'rgba(232,228,220,0.2)',fontFamily:sans}},'Ctrl + Entr\u00e9e pour continuer'),
+          e('button',{onClick:handleTextSubmit,disabled:!textValue.trim(),
+            style:{background:'none',border:'1px solid '+(textValue.trim()?'rgba(196,149,106,0.5)':'rgba(255,255,255,0.08)'),color:textValue.trim()?'#C4956A':'rgba(255,255,255,0.15)',padding:'12px 36px',fontSize:'12px',letterSpacing:'2px',textTransform:'uppercase',cursor:textValue.trim()?'pointer':'default',fontFamily:sans,transition:'all 0.3s ease',borderRadius:'2px'},
+            onMouseOver:function(ev){if(textValue.trim())ev.target.style.background='rgba(196,149,106,0.12)';},onMouseOut:function(ev){ev.target.style.background='none';}},'Continuer'))
+      ));
+    }
+    if(step.type==="choice"){
+      els.push(e('div',{key:'c',style:{display:'flex',flexDirection:'column',gap:'12px'}},
+        step.choices.map(function(choice,i){
+          return e('button',{key:i,onClick:function(){handleChoice(choice);},
+            style:{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.1)',color:'#e8e4dc',padding:'16px 20px',fontSize:'16px',textAlign:'left',cursor:'pointer',fontFamily:"'Cormorant Garamond',Georgia,serif",lineHeight:1.5,transition:'all 0.25s ease',borderRadius:'4px'},
+            onMouseOver:function(ev){ev.target.style.background='rgba(196,149,106,0.1)';ev.target.style.borderColor='rgba(196,149,106,0.4)';},
+            onMouseOut:function(ev){ev.target.style.background='rgba(255,255,255,0.03)';ev.target.style.borderColor='rgba(255,255,255,0.1)';}
+          },choice);
+        })
+      ));
+    }
+    content=e('div',null,els);
+  }
+
+  // CAPTURE (name + email)
+  if(step.type==="capture"){
+    var captureValid=userName.trim()&&userEmail.trim()&&userEmail.includes('@');
+    content=e('div',null,
+      e('div',{style:{fontSize:'11px',letterSpacing:'3px',textTransform:'uppercase',color:'#C4956A',marginBottom:'12px',fontFamily:sans}},'Derni\u00e8re \u00e9tape'),
+      e('h2',{style:{fontSize:'clamp(20px, 4vw, 28px)',fontWeight:400,lineHeight:1.5,margin:'0 0 12px',color:'#f0ece4'}},'Re\u00e7ois ta synth\u00e8se personnalis\u00e9e'),
+      e('p',{style:{fontSize:'15px',lineHeight:1.8,color:'rgba(232,228,220,0.55)',margin:'0 0 36px'}},'Tes r\u00e9ponses vont \u00eatre analys\u00e9es pour cr\u00e9er une synth\u00e8se unique, ancr\u00e9e dans tes mots. Tu la recevras aussi par email.'),
+      e('div',{style:{display:'flex',flexDirection:'column',gap:'16px',marginBottom:'28px'}},
+        e('div',null,
+          e('label',{style:{fontSize:'12px',letterSpacing:'1px',textTransform:'uppercase',color:'rgba(232,228,220,0.4)',fontFamily:sans,display:'block',marginBottom:'8px'}},'Ton pr\u00e9nom'),
+          e('input',{type:'text',value:userName,onChange:function(ev){setUserName(ev.target.value);},placeholder:'Pr\u00e9nom'})
+        ),
+        e('div',null,
+          e('label',{style:{fontSize:'12px',letterSpacing:'1px',textTransform:'uppercase',color:'rgba(232,228,220,0.4)',fontFamily:sans,display:'block',marginBottom:'8px'}},'Ton email'),
+          e('input',{type:'email',value:userEmail,onChange:function(ev){setUserEmail(ev.target.value);},placeholder:'email@exemple.com',
+            onKeyDown:function(ev){if(ev.key==='Enter'&&captureValid){handleCaptureSubmit();}}})
+        )
+      ),
+      e('p',{style:{fontSize:'12px',color:'rgba(232,228,220,0.3)',margin:'0 0 24px',lineHeight:1.6,fontFamily:sans}},'Tes donn\u00e9es restent confidentielles et ne sont utilis\u00e9es que dans le cadre de cet accompagnement.'),
+      e('button',{onClick:handleCaptureSubmit,disabled:!captureValid,
+        style:{background:captureValid?'rgba(196,149,106,0.1)':'none',border:'1px solid '+(captureValid?'rgba(196,149,106,0.5)':'rgba(255,255,255,0.08)'),color:captureValid?'#C4956A':'rgba(255,255,255,0.15)',padding:'14px 44px',fontSize:'13px',letterSpacing:'2px',textTransform:'uppercase',cursor:captureValid?'pointer':'default',fontFamily:sans,transition:'all 0.3s ease',borderRadius:'2px'},
+        onMouseOver:function(ev){if(captureValid)ev.target.style.background='rgba(196,149,106,0.2)';},
+        onMouseOut:function(ev){ev.target.style.background=captureValid?'rgba(196,149,106,0.1)':'none';}},'D\u00e9couvrir ma synth\u00e8se')
+    );
+  }
+
+  // CLOSING
+  if(step.type==="closing"){
+    function rb(label,color,key){
+      if(!answers[key])return null;
+      return e('div',{key:key,style:{marginBottom:'24px'}},
+        e('div',{style:{fontSize:'11px',letterSpacing:'2px',textTransform:'uppercase',color:color,marginBottom:'8px',fontFamily:sans}},label),
+        e('p',{style:{fontSize:'15px',lineHeight:1.8,color:'rgba(232,228,220,0.65)',margin:0,fontStyle:'italic'}},'\u201C'+answers[key]+'\u201D'));
+    }
+    var cl=[];
+    cl.push(e('div',{key:'d1',style:{width:'48px',height:'1px',background:'linear-gradient(90deg, transparent, rgba(196,149,106,0.5), transparent)',margin:'0 auto 40px'}}));
+    cl.push(e('h2',{key:'tt',style:{fontSize:'clamp(24px, 4vw, 32px)',fontWeight:400,lineHeight:1.4,margin:'0 0 36px',color:'#f0ece4'}},'Ce que tes r\u00e9ponses te montrent'));
+    cl.push(e('div',{key:'ans',style:{textAlign:'left',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'6px',padding:'28px 24px',marginBottom:'36px'}},
+      REFLECT_KEYS.map(function(r){return rb(r.label,r.color,r.key);})
+    ));
+
+    if(synthLoading){
+      cl.push(e('div',{key:'load',style:{textAlign:'center',padding:'40px 0'}},
+        e('div',{style:{fontSize:'14px',color:'rgba(232,228,220,0.5)',marginBottom:'16px',fontFamily:sans}},userName?userName+', analyse de tes r\u00e9ponses en cours':'Analyse de tes r\u00e9ponses en cours'),
+        e('div',{className:'dot-pulse',style:{fontSize:'24px',color:'#C4956A'}},e('span',null,'\u2022'),e('span',null,' \u2022'),e('span',null,' \u2022'))
+      ));
+    }
+
+    if(synthesis){
+      cl.push(e('div',{key:'sd',style:{width:'48px',height:'1px',background:'linear-gradient(90deg, transparent, rgba(196,149,106,0.5), transparent)',margin:'0 auto 32px'}}));
+      cl.push(e('h3',{key:'sh',style:{fontSize:'clamp(20px, 3.5vw, 26px)',fontWeight:400,lineHeight:1.4,margin:'0 0 28px',color:'#f0ece4'}},'Ta synth\u00e8se personnalis\u00e9e'));
+      var sb=synthesis.split('\n').filter(function(l){return l.trim();});
+      var se=sb.map(function(line,i){
+        var t=line.trim();var isT=t===t.toUpperCase()&&t.length>3&&t.length<30;
+        if(isT){return e('div',{key:'sl'+i,style:{fontSize:'11px',letterSpacing:'3px',textTransform:'uppercase',color:'#C4956A',marginTop:i>0?'28px':'0',marginBottom:'12px',fontFamily:sans}},t);}
+        return e('p',{key:'sl'+i,style:{fontSize:'15px',lineHeight:1.9,color:'rgba(232,228,220,0.7)',margin:'0 0 10px',textAlign:'left'}},t);
+      });
+      cl.push(e('div',{key:'sb',style:{textAlign:'left',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(196,149,106,0.15)',borderRadius:'6px',padding:'28px 24px',marginBottom:'36px'}},se));
+      if(emailSent){cl.push(e('p',{key:'sent',style:{fontSize:'13px',color:'rgba(232,228,220,0.4)',margin:'-20px auto 28px',fontFamily:sans,textAlign:'center'}},'\u2713 Synth\u00e8se envoy\u00e9e \u00e0 '+userEmail));}
+    }
+
+    if(synthError){cl.push(e('p',{key:'err',style:{fontSize:'14px',color:'rgba(232,228,220,0.4)',margin:'0 auto 24px',textAlign:'center'}},"La synth\u00e8se n'a pas pu \u00eatre g\u00e9n\u00e9r\u00e9e. Tes r\u00e9ponses ci-dessus parlent d'elles-m\u00eames."));}
+
+    cl.push(e('div',{key:'d2',style:{width:'48px',height:'1px',background:'linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)',margin:'12px auto 28px'}}));
+    cl.push(e('p',{key:'p1',style:{fontSize:'16px',lineHeight:1.9,color:'rgba(232,228,220,0.55)',maxWidth:'460px',margin:'0 auto 8px'}},'Tu es arriv\u00e9(e) avec une situation tourn\u00e9e vers l\u2019ext\u00e9rieur.'));
+    cl.push(e('p',{key:'p2',style:{fontSize:'16px',lineHeight:1.9,color:'rgba(232,228,220,0.55)',maxWidth:'460px',margin:'0 auto 32px'}},'Tes propres r\u00e9ponses t\u2019ont ramen\u00e9(e) vers l\u2019int\u00e9rieur.'));
+    cl.push(e('p',{key:'qt',style:{fontSize:'19px',lineHeight:1.7,color:'#C4956A',maxWidth:'460px',margin:'0 auto 40px',fontStyle:'italic'}},'\u00ab Nous ne sommes pas les nuages, ni la foudre, ni la pluie. Nous sommes le ciel. \u00bb'));
+
+    if(synthesis||synthError){
+      cl.push(e('div',{key:'pdf',style:{margin:'0 auto 24px'}},
+        e('button',{onClick:handleDownloadPDF,
+          style:{background:'rgba(196,149,106,0.08)',border:'1px solid rgba(196,149,106,0.4)',color:'#C4956A',padding:'16px 40px',fontSize:'13px',letterSpacing:'2px',textTransform:'uppercase',cursor:'pointer',fontFamily:sans,transition:'all 0.3s ease',borderRadius:'2px',display:'inline-flex',alignItems:'center',gap:'10px'},
+          onMouseOver:function(ev){ev.currentTarget.style.background='rgba(196,149,106,0.18)';},
+          onMouseOut:function(ev){ev.currentTarget.style.background='rgba(196,149,106,0.08)';}
+        },e('span',null,'\u2193'),e('span',null,'T\u00e9l\u00e9charger mon r\u00e9capitulatif PDF'))
+      ));
+    }
+
+    cl.push(e('div',{key:'cl',style:{width:'1px',height:'32px',background:'rgba(196,149,106,0.2)',margin:'16px auto 28px'}}));
+    cl.push(e('p',{key:'ct',style:{fontSize:'15px',lineHeight:1.8,color:'rgba(232,228,220,0.55)',maxWidth:'440px',margin:'0 auto 8px'}},'Si tu veux aller plus loin et travailler sur ce que ce questionnaire a mis en lumi\u00e8re, tu peux r\u00e9server une s\u00e9ance avec Mathieu.'));
+    cl.push(e('p',{key:'cs',style:{fontSize:'13px',lineHeight:1.6,color:'rgba(232,228,220,0.35)',maxWidth:'440px',margin:'0 auto 24px',fontFamily:sans}},'Tu pourras lui transmettre ton PDF pour qu\'il ait d\u00e9j\u00e0 une lecture de ta situation.'));
+    cl.push(e('a',{key:'cb',href:'https://tidycal.com/cursuslp/chemindudedans',target:'_blank',rel:'noopener',
+      style:{display:'inline-block',background:'rgba(196,149,106,0.12)',border:'1px solid rgba(196,149,106,0.6)',color:'#C4956A',padding:'16px 44px',fontSize:'13px',letterSpacing:'2px',textTransform:'uppercase',cursor:'pointer',fontFamily:sans,transition:'all 0.3s ease',borderRadius:'2px',textDecoration:'none',marginBottom:'48px'},
+      onMouseOver:function(ev){ev.target.style.background='rgba(196,149,106,0.22)';},
+      onMouseOut:function(ev){ev.target.style.background='rgba(196,149,106,0.12)';}},'R\u00e9server ma s\u00e9ance'));
+    cl.push(e('div',{key:'ft',style:{fontSize:'11px',letterSpacing:'3px',textTransform:'uppercase',color:'rgba(232,228,220,0.2)',fontFamily:sans,paddingBottom:'20px'}},'BIOCURSUS'));
+
+    content=e('div',{style:{textAlign:'center'}},cl);
+  }
+
+  return e('div',{style:{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'48px 20px',position:'relative'}},
+    ambient1,ambient2,progressBar,
+    e('div',{style:{maxWidth:'600px',width:'100%',opacity:visible?1:0,transform:visible?'translateY(0)':'translateY(16px)',transition:'opacity 0.5s ease, transform 0.5s ease'}},content)
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(e(App));
+</script>
+</body>
+</html>
