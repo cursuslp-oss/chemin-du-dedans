@@ -1,0 +1,7 @@
+{
+  "name": "chemin-du-dedans",
+  "private": true,
+  "dependencies": {
+    "resend": "^4.0.0"
+  }
+}
