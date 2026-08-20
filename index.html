@@ -78,30 +78,14 @@ var REFLECT_KEYS=[
   {label:"Ce que tu veux te rappeler",key:"q9",color:"#B8860B"}
 ];
 
-var SYSTEM_PROMPT="Tu es le moteur de synth\u00e8se du questionnaire \"Le Chemin du Dedans\" de BIOCURSUS.\n\nPRINCIPES FONDATEURS :\n1. Le conflit commence en soi : d\u00e8s qu'on dit non \u00e0 ce qu'on sent en soi, le conflit d\u00e9marre.\n2. Nous sommes des cr\u00e9ateurs : tout ce qu'il y a dans notre existence, c'est ce que nous portons \u00e0 l'int\u00e9rieur.\n3. Le principe du ring : faute d'un des deux combattants, la guerre s'arr\u00eate.\n4. L'amour sous-jacent \u00e0 tout conflit : dans toute dispute il y a une aspiration totale \u00e0 l'amour.\n5. Le champ magn\u00e9tique : on attire \u00e0 soi ce que l'on vibre.\n6. Volont\u00e9 de surface vs volont\u00e9 v\u00e9ritable : vouloir que l'ext\u00e9rieur change vs se rappeler la paix qu'on est.\n7. Le libre arbitre : \u00e0 chaque instant, s\u00e9paration ou unit\u00e9.\n8. Le corps physique comme \u00e9ponge \u00e9nerg\u00e9tique : les conflits int\u00e9rieurs descendent dans le corps.\n9. Le miroir : l'univers refl\u00e8te ce qu'on porte en soi.\n10. Nous sommes le ciel, pas les nuages.\n\nINSTRUCTIONS :\nTu re\u00e7ois les r\u00e9ponses d'une personne. Produis une synth\u00e8se personnalis\u00e9e en 3 parties :\n\n1. LE MIROIR (4-5 lignes) : Ce que ses r\u00e9ponses r\u00e9v\u00e8lent sur le conflit int\u00e9rieur qu'elle porte. Pas un diagnostic. Une mise en lumi\u00e8re douce mais honn\u00eate.\n\n2. LE FIL ROUGE (3-4 lignes) : Le lien entre sa situation ext\u00e9rieure et ce qui en elle n'est pas en paix. Relier les r\u00e9ponses entre elles.\n\n3. TES PREMIERS PAS (2-3 pistes concr\u00e8tes) : Des choses \u00e0 observer ou pratiquer au quotidien pour commencer \u00e0 revenir \u00e0 soi. Ancr\u00e9es dans ce que la personne a \u00e9crit.\n\nR\u00c8GLES :\n- Tutoiement obligatoire\n- Ton chaleureux, profond, sans jargon\n- Jamais de diagnostic ni de pathologisation\n- Ne jamais utiliser de tirets longs\n- Pas de listes \u00e0 puces, prose fluide\n- Utilise les mots de la personne\n- Commence chaque partie par son titre en majuscules suivi d'un saut de ligne\n- Maximum 250 mots au total\n- Ne mentionne jamais BIOCURSUS, Mathieu, ni de CTA commercial";
-
-function buildUserPrompt(answers){
-  var parts=["Voici les r\u00e9ponses de cette personne au questionnaire Le Chemin du Dedans :\n"];
-  var labels={q1:"Situation qui p\u00e8se",q2:"Responsable d\u00e9sign\u00e9",q3:"Sch\u00e9ma r\u00e9current",q3b:"Ce que les situations r\u00e9currentes ont en commun",q4:"Si la situation disparaissait",q5:"Ressenti corporel",q6:"Depuis quand ce ressenti",q7:"Ce qu'elle veut vraiment",q8:"Ce que la situation montre d'elle",q9:"Ce qu'elle veut se rappeler",q10:"Son choix"};
-  Object.keys(labels).forEach(function(k){if(answers[k])parts.push(labels[k]+" : "+answers[k]);});
-  parts.push("\nG\u00e9n\u00e8re la synth\u00e8se personnalis\u00e9e.");
-  return parts.join("\n");
-}
-
-async function fetchSynthesis(answers){
-  var r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,system:SYSTEM_PROMPT,messages:[{role:"user",content:buildUserPrompt(answers)}]})});
+async function fetchSynthesisAndSend(name,email,answers){
+  var r=await fetch("/.netlify/functions/submit",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({name:name,email:email,answers:answers})});
   var d=await r.json();
-  return d.content.map(function(b){return b.text||"";}).filter(Boolean).join("\n");
+  return d.synthesis||"";
 }
 
-async function sendEmails(name,email,answers,synthesis){
-  try{
-    var r=await fetch("/.netlify/functions/submit",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({name:name,email:email,answers:answers,synthesis:synthesis})});
-    return r.ok;
-  }catch(err){console.error("Send error:",err);return false;}
-}
+
 
 function generatePDF(answers,synthesis){
   var jsPDF=window.jspdf.jsPDF;
@@ -189,9 +173,8 @@ function App(){
   useEffect(function(){
     if(step.type==="closing"&&!synthesis&&!synthLoading){
       setSynthLoading(true);
-      fetchSynthesis(answers).then(function(text){
-        setSynthesis(text);setSynthLoading(false);
-        sendEmails(userName,userEmail,answers,text).then(function(ok){if(ok)setEmailSent(true);});
+      fetchSynthesisAndSend(userName,userEmail,answers).then(function(text){
+        setSynthesis(text);setSynthLoading(false);setEmailSent(true);
       }).catch(function(err){console.error(err);setSynthError(true);setSynthLoading(false);});
     }
   },[step.type]);
